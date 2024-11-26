@@ -10,28 +10,49 @@
 
     <!-- Link zu allgemeinem Custom CSS -->
     <link rel="stylesheet" href="/static/css/chat.css">
-
     <link rel="stylesheet" href="/static/css/header.css">
 
-
     <style>
-        /* Hier kannst du zusätzliche Styles für den Chat-Raum einfügen, die spezifisch für diese Seite sind */
+        .popup-menu {
+            position: absolute;
+            display: none;
+            background: white;
+            border: 1px solid #ddd;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            padding: 10px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+        }
+
+        .reply {
+            font-size: 12px;
+            color: gray;
+            margin-bottom: 5px;
+        }
+
+        .time {
+            font-size: 10px;
+            color: #999;
+        }
     </style>
 </head>
 <body>
-    <!-- Include Header hier -->
+    <!-- Include Header -->
     {% include 'header.html' %}
 
     <h2>Chat Room</h2>
-    <input type="color" id="colorPicker" value="{{ current_user.color }}">  <!-- Farbauswahl -->
+    <input type="color" id="colorPicker" value="{{ current_user.color }}"> <!-- Farbauswahl -->
     <div id="messages"></div>
     <div>
         <input id="message_input" type="text" placeholder="Nachricht eingeben..." autocomplete="off">
         <button id="send_button">Senden</button>
     </div>
-    <p id="reply_info" style="font-size: 12px; color: gray;"></p> <!-- Area to show the message you're replying to -->
+    <p id="reply_info" style="font-size: 12px; color: gray;"></p> <!-- Bereich zum Anzeigen der Antwort -->
 
-    <div id="popupMenu" class="popup-menu"></div> <!-- Popup Menu -->
+    <div id="popupMenu" class="popup-menu"></div> <!-- Popup-Menü -->
 
     <script>
         const socket = io();
@@ -41,11 +62,11 @@
         const messageInput = document.getElementById('message_input');
         const sendButton = document.getElementById('send_button');
         const colorPicker = document.getElementById('colorPicker');
-        const replyInfo = document.getElementById('reply_info'); // For displaying reply status
-        const popupMenu = document.getElementById('popupMenu'); // Popup Menu
+        const replyInfo = document.getElementById('reply_info'); // Für die Antwortanzeige
+        const popupMenu = document.getElementById('popupMenu'); // Popup-Menü
 
         let mutedUsers = [];  // Liste der stummgeschalteten Benutzer
-        let replyingTo = null;  // Reference to the message being replied to
+        let replyingTo = null;  // Referenz auf die Nachricht, auf die geantwortet wird
 
         // Funktion zum Senden der Nachricht
         function sendMessage() {
@@ -58,10 +79,10 @@
                     msg: message,
                     username: username,
                     color: color,
-                    replyTo: replyingTo  // Send the reply reference
+                    replyTo: replyingTo  // Antwort-Referenz senden
                 });
 
-                // Clear the reply information after sending the message
+                // Antwortinfo löschen und Eingabe zurücksetzen
                 replyingTo = null;
                 replyInfo.textContent = '';
                 messageInput.value = '';  // Nachrichtenfeld leeren
@@ -69,85 +90,83 @@
         }
 
         // Event-Listener für den Button "Senden"
-        sendButton.onclick = function() {
-            sendMessage();  // Ruft die Funktion auf, um die Nachricht zu senden
+        sendButton.onclick = function () {
+            sendMessage();
         };
 
         // Event-Listener für die Enter-Taste im Nachrichten-Eingabefeld
-        messageInput.addEventListener('keypress', function(event) {
+        messageInput.addEventListener('keypress', function (event) {
             if (event.key === 'Enter') {
-                event.preventDefault();  // Verhindert das Standardverhalten (z.B. Absenden eines Formulars)
-                sendMessage();  // Sende die Nachricht
+                event.preventDefault();
+                sendMessage();
             }
         });
 
         // Funktion zum Setzen der Antwort auf eine Nachricht
         function setReplyToMessage(messageText) {
-            replyingTo = messageText;  // Store the message being replied to
-            replyInfo.innerHTML = `Antworten auf: "${messageText}" <span onclick="clearReply()" style="color: red; cursor: pointer;">X</span>`;  // Show the reply info with clear button
+            replyingTo = messageText;  // Speichert die Nachricht, auf die geantwortet wird
+            replyInfo.innerHTML = `Antworten auf: "${messageText}" <span onclick="clearReply()" style="color: red; cursor: pointer;">X</span>`;
         }
 
         // Funktion zum Löschen der Antwort
         function clearReply() {
             replyingTo = null;
-            replyInfo.textContent = '';  // Clear the reply information
+            replyInfo.textContent = '';  // Antwortinfo löschen
         }
-
-        // Funktion zum Stummschalten oder Entstummschalten von Benutzern
-        function toggleMuteUser(username) {
-            if (mutedUsers.includes(username)) {
-                mutedUsers = mutedUsers.filter(user => user !== username);  // Remove from mutedUsers
-                alert(`${username} wurde entstummt.`);
-            } else {
-                mutedUsers.push(username);  // Add to mutedUsers
-                alert(`${username} wurde stummgeschaltet.`);
-            }
-            closePopup(); // Schließe das Popup nach der Auswahl
-        }
-
-        // Funktion zum Schließen des Popups
-        function closePopup() {
-            popupMenu.style.display = 'none'; // Popup verstecken
-        }
-
-        // Empfang von Nachrichten
-        socket.on('receive_message', function(data) {
-            const messageElement = document.createElement('div');
-            messageElement.classList.add('message');
-
-            if (!mutedUsers.includes(data.username)) {  // Nur Nachrichten anzeigen, wenn der Benutzer nicht stummgeschaltet ist
-                // Benutzername, Nachricht und Uhrzeit anzeigen
-                messageElement.innerHTML = `
-                    <span>
-                        ${data.replyTo ? `<div class="reply">Antwort auf: ${data.replyTo}</div>` : ''}  <!-- Show the original message if it's a reply -->
-                        <span class="username" style="color: ${data.color}">${data.username}</span>: ${data.msg}
-                    </span>
-                    <span class="time">${data.time}</span>
-                `;
-
-                // Add click event to username to show the popup menu
-                messageElement.querySelector('.username').onclick = function(event) {
-                    event.stopPropagation();  // Prevent triggering the reply function
-                    showPopup(event, data.username);  // Show the popup menu
-                };
-
-                messagesDiv.appendChild(messageElement);
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;  // Scroll to bottom
-            }
-        });
 
         // Funktion zum Anzeigen des Popup-Menüs
         function showPopup(event, username) {
-            const x = event.clientX; // X-Position des Mauszeigers
-            const y = event.clientY; // Y-Position des Mauszeigers
-            popupMenu.style.display = 'block'; // Popup sichtbar machen
-            popupMenu.style.left = `${x}px`; // Positionieren des Popups
-            popupMenu.style.top = `${y}px`; // Positionieren des Popups
+            const x = event.clientX; // Maus-X-Position
+            const y = event.clientY; // Maus-Y-Position
+            popupMenu.style.display = 'block';
+            popupMenu.style.left = `${x}px`;
+            popupMenu.style.top = `${y}px`;
 
             popupMenu.innerHTML = `
                 <button onclick="toggleMuteUser('${username}')">Stummschalten/Entstummschalten</button>
             `;
         }
+
+        // Funktion zum Stummschalten oder Entstummschalten von Benutzern
+        function toggleMuteUser(username) {
+            if (mutedUsers.includes(username)) {
+                mutedUsers = mutedUsers.filter(user => user !== username);
+                alert(`${username} wurde entstummt.`);
+            } else {
+                mutedUsers.push(username);
+                alert(`${username} wurde stummgeschaltet.`);
+            }
+            closePopup();
+        }
+
+        // Funktion zum Schließen des Popups
+        function closePopup() {
+            popupMenu.style.display = 'none';
+        }
+
+        // Empfang von Nachrichten
+        socket.on('receive_message', function (data) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+
+            if (!mutedUsers.includes(data.username)) {
+                messageElement.innerHTML = `
+                    <span>
+                        ${data.replyTo ? `<div class="reply">Antwort auf: ${data.replyTo}</div>` : ''}
+                        <span class="username" style="color: ${data.color}">${data.username}</span>: ${data.msg}
+                    </span>
+                    <span class="time">${data.time}</span>
+                `;
+
+                messageElement.querySelector('.username').onclick = function (event) {
+                    event.stopPropagation();
+                    showPopup(event, data.username);
+                };
+
+                messagesDiv.appendChild(messageElement);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }
+        });
     </script>
 </body>
 </html>
