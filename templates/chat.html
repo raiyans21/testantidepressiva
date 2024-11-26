@@ -10,49 +10,48 @@
 
     <!-- Link zu allgemeinem Custom CSS -->
     <link rel="stylesheet" href="/static/css/chat.css">
+
     <link rel="stylesheet" href="/static/css/header.css">
 
+
     <style>
-        .popup-menu {
-            position: absolute;
-            display: none;
-            background: white;
-            border: 1px solid #ddd;
-            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-            z-index: 100;
-            padding: 10px;
-        }
-
-        .message {
-            margin-bottom: 10px;
-        }
-
-        .reply {
-            font-size: 12px;
-            color: gray;
-            margin-bottom: 5px;
-        }
-
-        .time {
-            font-size: 10px;
-            color: #999;
-        }
+        /* Hier kannst du zusätzliche Styles für den Chat-Raum einfügen, die spezifisch für diese Seite sind */
     </style>
 </head>
 <body>
-    <!-- Include Header -->
+    <!-- Include Header hier -->
     {% include 'header.html' %}
 
     <h2>Chat Room</h2>
-    <input type="color" id="colorPicker" value="{{ current_user.color }}"> <!-- Farbauswahl -->
+    <input type="color" id="colorPicker" value="{{ current_user.color }}">  <!-- Farbauswahl -->
     <div id="messages"></div>
     <div>
         <input id="message_input" type="text" placeholder="Nachricht eingeben..." autocomplete="off">
         <button id="send_button">Senden</button>
     </div>
-    <p id="reply_info" style="font-size: 12px; color: gray;"></p> <!-- Bereich zum Anzeigen der Antwort -->
+    <p id="reply_info" style="font-size: 12px; color: gray;"></p> <!-- Area to show the message you're replying to -->
 
-    <div id="popupMenu" class="popup-menu"></div> <!-- Popup-Menü -->
+    <div id="popupMenu" class="popup-menu"></div> <!-- Popup Menu -->
+
+     <div id="chat">
+  {% for message in messages %}
+  <div class="message" id="message-{{ message.id }}">
+    <p style="color: {{ message.color }};">{{ message.username }}: {{ message.content }}</p>
+    <small>{{ message.timestamp }}</small>
+    {% if message.reply_to %}
+    <blockquote>Reply to: {{ message.reply_to }}</blockquote>
+    {% endif %}
+    <!-- Buttons -->
+    <button onclick="replyMessage({{ message.id }})">Reply</button>
+    <button onclick="deleteMessage({{ message.id }})">Delete</button>
+    <button onclick="editMessage({{ message.id }})">Edit</button>
+    <button onclick="addReaction({{ message.id }}, '😊')">😊</button>
+    <button onclick="addReaction({{ message.id }}, '👍')">👍</button>
+    <button onclick="addReaction({{ message.id }}, '❤️')">❤️</button>
+  </div>
+  {% endfor %}
+</div>
+
 
     <script>
         const socket = io();
@@ -62,11 +61,11 @@
         const messageInput = document.getElementById('message_input');
         const sendButton = document.getElementById('send_button');
         const colorPicker = document.getElementById('colorPicker');
-        const replyInfo = document.getElementById('reply_info'); // Für die Antwortanzeige
-        const popupMenu = document.getElementById('popupMenu'); // Popup-Menü
+        const replyInfo = document.getElementById('reply_info'); // For displaying reply status
+        const popupMenu = document.getElementById('popupMenu'); // Popup Menu
 
         let mutedUsers = [];  // Liste der stummgeschalteten Benutzer
-        let replyingTo = null;  // Referenz auf die Nachricht, auf die geantwortet wird
+        let replyingTo = null;  // Reference to the message being replied to
 
         // Funktion zum Senden der Nachricht
         function sendMessage() {
@@ -79,10 +78,10 @@
                     msg: message,
                     username: username,
                     color: color,
-                    replyTo: replyingTo  // Antwort-Referenz senden
+                    replyTo: replyingTo  // Send the reply reference
                 });
 
-                // Antwortinfo löschen und Eingabe zurücksetzen
+                // Clear the reply information after sending the message
                 replyingTo = null;
                 replyInfo.textContent = '';
                 messageInput.value = '';  // Nachrichtenfeld leeren
@@ -91,57 +90,44 @@
 
         // Event-Listener für den Button "Senden"
         sendButton.onclick = function () {
-            sendMessage();
+            sendMessage();  // Ruft die Funktion auf, um die Nachricht zu senden
         };
 
         // Event-Listener für die Enter-Taste im Nachrichten-Eingabefeld
         messageInput.addEventListener('keypress', function (event) {
             if (event.key === 'Enter') {
-                event.preventDefault();
-                sendMessage();
+                event.preventDefault();  // Verhindert das Standardverhalten (z.B. Absenden eines Formulars)
+                sendMessage();  // Sende die Nachricht
             }
         });
 
         // Funktion zum Setzen der Antwort auf eine Nachricht
         function setReplyToMessage(messageText) {
-            replyingTo = messageText;  // Speichert die Nachricht, auf die geantwortet wird
-            replyInfo.innerHTML = `Antworten auf: "${messageText}" <span onclick="clearReply()" style="color: red; cursor: pointer;">X</span>`;
+            replyingTo = messageText;  // Store the message being replied to
+            replyInfo.innerHTML = Antworten auf: "${messageText}" <span onclick="clearReply()" style="color: red; cursor: pointer;">X</span>;  // Show the reply info with clear button
         }
 
         // Funktion zum Löschen der Antwort
         function clearReply() {
             replyingTo = null;
-            replyInfo.textContent = '';  // Antwortinfo löschen
-        }
-
-        // Funktion zum Anzeigen des Popup-Menüs
-        function showPopup(event, username) {
-            const x = event.clientX; // Maus-X-Position
-            const y = event.clientY; // Maus-Y-Position
-            popupMenu.style.display = 'block';
-            popupMenu.style.left = `${x}px`;
-            popupMenu.style.top = `${y}px`;
-
-            popupMenu.innerHTML = `
-                <button onclick="toggleMuteUser('${username}')">Stummschalten/Entstummschalten</button>
-            `;
+            replyInfo.textContent = '';  // Clear the reply information
         }
 
         // Funktion zum Stummschalten oder Entstummschalten von Benutzern
         function toggleMuteUser(username) {
             if (mutedUsers.includes(username)) {
-                mutedUsers = mutedUsers.filter(user => user !== username);
-                alert(`${username} wurde entstummt.`);
+                mutedUsers = mutedUsers.filter(user => user !== username);  // Remove from mutedUsers
+                alert(${username} wurde entstummt.);
             } else {
-                mutedUsers.push(username);
-                alert(`${username} wurde stummgeschaltet.`);
+                mutedUsers.push(username);  // Add to mutedUsers
+                alert(${username} wurde stummgeschaltet.);
             }
-            closePopup();
+            closePopup(); // Schließe das Popup nach der Auswahl
         }
 
         // Funktion zum Schließen des Popups
         function closePopup() {
-            popupMenu.style.display = 'none';
+            popupMenu.style.display = 'none'; // Popup verstecken
         }
 
         // Empfang von Nachrichten
@@ -149,24 +135,117 @@
             const messageElement = document.createElement('div');
             messageElement.classList.add('message');
 
-            if (!mutedUsers.includes(data.username)) {
-                messageElement.innerHTML = `
+            if (!mutedUsers.includes(data.username)) {  // Nur Nachrichten anzeigen, wenn der Benutzer nicht stummgeschaltet ist
+                // Benutzername, Nachricht und Uhrzeit anzeigen
+                messageElement.innerHTML =
                     <span>
-                        ${data.replyTo ? `<div class="reply">Antwort auf: ${data.replyTo}</div>` : ''}
+                        ${data.replyTo ? <div class="reply">Antwort auf: ${data.replyTo}</div> : ''}  <!-- Show the original message if it's a reply -->
                         <span class="username" style="color: ${data.color}">${data.username}</span>: ${data.msg}
                     </span>
                     <span class="time">${data.time}</span>
-                `;
+                ;
 
+                // Add click event to username to show the popup menu
                 messageElement.querySelector('.username').onclick = function (event) {
-                    event.stopPropagation();
-                    showPopup(event, data.username);
+                    event.stopPropagation();  // Prevent triggering the reply function
+                    showPopup(event, data.username);  // Show the popup menu
                 };
 
                 messagesDiv.appendChild(messageElement);
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;  // Scroll to bottom
             }
         });
+
+        // Funktion zum Anzeigen des Popup-Menüs
+        function showPopup(event, username) {
+            const x = event.clientX; // X-Position des Mauszeigers
+            const y = event.clientY; // Y-Position des Mauszeigers
+            popupMenu.style.display = 'block'; // Popup sichtbar machen
+            popupMenu.style.left = ${x}px; // Positionieren des Popups
+            popupMenu.style.top = ${y}px; // Positionieren des Popups
+
+            popupMenu.innerHTML =
+                <button onclick="toggleMuteUser('${username}')">Stummschalten/Entstummschalten</button>
+            ;
+        }
+
+        function replyMessage(messageId) {
+    const reply = prompt("Enter your reply:");
+    if (reply) {
+        socket.emit('reply_message', {
+            message_id: messageId,
+            reply: reply,
+            username: username
+        });
+    }
+}
+
+function deleteMessage(messageId) {
+    socket.emit('delete_message', { message_id: messageId });
+}
+
+function editMessage(messageId) {
+    const newContent = prompt("Enter new content:");
+    if (newContent) {
+        socket.emit('edit_message', {
+            message_id: messageId,
+            new_content: newContent
+        });
+    }
+}
+
+function addReaction(messageId, emoji) {
+    socket.emit('add_reaction', {
+        message_id: messageId,
+        emoji: emoji,
+        username: username
+    });
+}
+
+//..............................................................................................................
+        //Even-Listener zum Empfangen von Aktionen
+
+
+// Reply anzeigen
+socket.on('receive_reply', function (data) {
+    const messageElement = document.getElementById(`message-${data.message_id}`);
+    if (messageElement) {
+        const replyBlock = document.createElement('blockquote');
+        replyBlock.innerText = `Reply from ${data.username}: ${data.reply}`;
+        messageElement.appendChild(replyBlock);
+    }
+});
+
+// Nachricht löschen
+socket.on('remove_message', function (data) {
+    const messageElement = document.getElementById(`message-${data.message_id}`);
+    if (messageElement) {
+        messageElement.remove();
+    }
+});
+
+// Nachricht bearbeiten
+socket.on('update_message', function (data) {
+    const messageElement = document.getElementById(`message-${data.message_id}`);
+    if (messageElement) {
+        const messageContent = messageElement.querySelector('p');
+        if (messageContent) {
+            messageContent.innerText = data.new_content;
+        }
+    }
+});
+
+// Reaktion anzeigen
+socket.on('receive_reaction', function (data) {
+    const messageElement = document.getElementById(`message-${data.message_id}`);
+    if (messageElement) {
+        const reactionBlock = document.createElement('span');
+        reactionBlock.innerText = `${data.username} reacted with ${data.emoji}`;
+        messageElement.appendChild(reactionBlock);
+    }
+});
+
+
     </script>
 </body>
 </html>

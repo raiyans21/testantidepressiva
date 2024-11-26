@@ -1,3 +1,5 @@
+from mailbox import Message
+
 from flask import Blueprint, render_template
 from flask_login import login_required
 from datetime import datetime
@@ -9,7 +11,9 @@ chat_bp = Blueprint('chat', __name__)
 @chat_bp.route('/')
 @login_required
 def chat():
-    return render_template('chat.html')
+    # Nachrichten aus der Datenbank abrufen (falls zutreffend)
+    messages = Message.query.all()
+    return render_template('chat.html', messages=messages)
 
 # SocketIO-Events
 @socketio.on('send_message')
@@ -78,3 +82,49 @@ def handle_react_message(data):
         'emoji': emoji,
         'username': username
     }, broadcast=True)
+
+    # Reply-Funktion
+    @socketio.on('reply_message')
+    def handle_reply_message(data):
+        message_id = data.get('message_id')
+        reply_content = data.get('reply')
+        username = data.get('username')
+        timestamp = datetime.now().strftime('%H:%M')
+
+        emit('receive_reply', {
+            'message_id': message_id,
+            'reply': reply_content,
+            'username': username,
+            'time': timestamp
+        }, broadcast=True)
+
+    # Delete-Funktion
+    @socketio.on('delete_message')
+    def handle_delete_message(data):
+        message_id = data.get('message_id')
+        emit('remove_message', {'message_id': message_id}, broadcast=True)
+
+    # Bearbeiten-Funktion
+    @socketio.on('edit_message')
+    def handle_edit_message(data):
+        message_id = data.get('message_id')
+        new_content = data.get('new_content')
+
+        emit('update_message', {
+            'message_id': message_id,
+            'new_content': new_content
+        }, broadcast=True)
+
+    # Reaktionen (Emojis)
+    @socketio.on('add_reaction')
+    def handle_react_message(data):
+        message_id = data.get('message_id')
+        emoji = data.get('emoji')
+        username = data.get('username')
+
+        emit('receive_reaction', {
+            'message_id': message_id,
+            'emoji': emoji,
+            'username': username
+        }, broadcast=True)
+
